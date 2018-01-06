@@ -4,11 +4,20 @@
 
 let getEquation = () => (Random.int(10) + 1, Random.int(10) + 1);
 
+let printEquation = (numbers, guess) =>
+  switch numbers {
+  | Some((x, y)) => {j|$x * $y = $guess|j}
+  | None => "Done!"
+  };
+
+let rec getList = (table: int, start: int, max: int) =>
+  if (start > max) {
+    [];
+  } else {
+    [(table, start), ...getList(table, start + 1, max)];
+  };
+
 let getProduct = ((x, y)) => x * y;
-
-let eq = "=";
-
-let notEq = "\226\137\160";
 
 type action =
   | Click
@@ -16,9 +25,10 @@ type action =
   | InputChange(string);
 
 type state = {
-  numbers: (int, int),
+  numbers: option((int, int)),
   guess: int,
-  correct: bool
+  correct: bool,
+  queue: list((int, int))
 };
 
 let change = event =>
@@ -41,17 +51,37 @@ let component = ReasonReact.reducerComponent("App");
 
 let make = _children => {
   ...component,
-  initialState: () => {numbers: getEquation(), guess: 0, correct: false},
+  initialState: () => {
+    let [head, ...tail] = getList(3, 1, 10);
+    {numbers: Some(head), guess: 0, correct: false, queue: tail};
+  },
   reducer: (action, state) =>
     switch action {
     | Click
     | KeyDown(13) =>
-      let product = getProduct(state.numbers);
+      let product =
+        switch state.numbers {
+        | Some(nums) => getProduct(nums)
+        | None => 9999
+        };
       let correct = state.guess == product;
-      correct ? Js.log("woo") : Js.log("fuck");
+      let nextNumbers =
+        switch state.queue {
+        | [] => None
+        | [hd, ..._] => Some(hd)
+        };
+      let updatedQueue =
+        switch state.queue {
+        | [] => []
+        | [_, ...tl] => tl
+        };
+      if (correct) {
+        Js.log(printEquation(state.numbers, state.guess));
+      };
       ReasonReact.Update({
         ...state,
-        numbers: correct ? getEquation() : state.numbers,
+        numbers: correct ? nextNumbers : state.numbers,
+        queue: correct ? updatedQueue : state.queue,
         guess: correct ? 0 : state.guess
       });
     | InputChange(value) =>
@@ -60,9 +90,7 @@ let make = _children => {
     },
   render: ({state, reduce}) => {
     let {guess, numbers} = state;
-    let x = string_of_int(fst(numbers));
-    let y = string_of_int(snd(numbers));
-    let equation = {j|$x * $y = $guess|j};
+    let equation = printEquation(numbers, guess);
     <div className="App">
       <div className="App-header">
         <img src=logo className="App-logo" alt="logo" />
